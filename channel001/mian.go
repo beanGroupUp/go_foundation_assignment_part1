@@ -1,5 +1,10 @@
 package main
 
+import (
+	"fmt"
+	"time"
+)
+
 /**
 channel 是 Go 中定义的一种类型，专门用来在多个 goroutine 之间通信的线程安全的数据结构。
 
@@ -42,4 +47,69 @@ func <method_name>(<channel_name> <-chan <type>)
 
 */
 
-//值接收
+// 只接收channel的函数
+func receiveOnly(ch <-chan int) {
+	for v := range ch {
+		fmt.Println("接收到%d\n", v)
+	}
+}
+
+// 只发送channel的函数
+func sendOnly(ch chan<- int) {
+	for i := 0; i < 10; i++ {
+		//接收
+		ch <- i
+		fmt.Println("发送%d\n", i)
+	}
+	close(ch)
+}
+
+func main() {
+	//创建一个带缓冲的channel(容量为3)
+	ch := make(chan int, 10)
+	//启动发送goroutine
+	go sendOnly(ch)
+	//启动接收goroutine
+	go receiveOnly(ch)
+	//使用select进行的多路复用
+	//再两秒之后执行
+	fmt.Println("两秒之前")
+	//2S后超时
+	timeout := time.After(2 * time.Second)
+	fmt.Println("两秒之后")
+	for {
+		select {
+		case v, ok := <-ch:
+			if !ok {
+				fmt.Println("Channel已关闭")
+				return
+			}
+			fmt.Println("主goroutine接收到：%d\n", v)
+		case <-timeout: //2秒后超时进入
+			fmt.Println("操作超时")
+			return
+		default:
+			fmt.Println("没有数据，等待中...")
+		}
+		fmt.Println("------")
+	}
+
+	time.Sleep(100 * time.Second)
+}
+
+/**
+1.18.3 锁与 channel
+在 Go 中，当需要 goroutine 之间协作地方，更常见的方式是使用 channel，而不是 sync 包中的 Mutex 或 RWMutex 的互斥锁。但其实它们各有侧重。
+
+大部分时候，流程是根据数据驱动的，channel 会被使用得更频繁。
+
+channel 擅长的是数据流动的场景：
+
+传递数据的所有权，即把某个数据发送给其他协程。
+分发任务，每个任务都是一个数据。
+交流异步结果，结果是一个数据。
+而锁使用的场景更偏向同一时间只给一个协程访问数据的权限：
+
+访问缓存
+管理状态
+*/
